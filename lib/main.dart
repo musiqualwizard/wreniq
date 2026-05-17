@@ -9,12 +9,14 @@ import 'providers/vehicle_provider.dart';
 import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
+import 'services/notification_service.dart';
 import 'services/premium_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseService.initialize();
+  await NotificationService.init();
   // Lock to portrait — most comfortable for a scanning app
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

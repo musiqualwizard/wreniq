@@ -18,7 +18,7 @@ import 'obd_screen.dart';
 import 'recall_alerts_screen.dart';
 import 'saved_scans_screen.dart';
 import 'scan_screen.dart';
-import 'scam_detector_screen.dart';
+import 'quote_scanner_screen.dart';
 import 'settings_screen.dart';
 import 'sound_diagnosis_screen.dart';
 
@@ -775,13 +775,13 @@ class HomeScreen extends StatelessWidget {
   Widget _buildScamDetectorCard(BuildContext context) {
     return _featureCard(
       context,
-      icon: Icons.shield_outlined,
-      title: 'Scam Detector',
-      subtitle: 'Analyse repair quotes for overcharging',
+      icon: Icons.document_scanner_outlined,
+      title: 'Quote Scanner',
+      subtitle: 'Scan or paste a quote to check for overcharging',
       badge: 'QUOTE',
       color: AppTheme.success,
       onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const ScamDetectorScreen())),
+          MaterialPageRoute(builder: (_) => const QuoteScannerScreen())),
     );
   }
 

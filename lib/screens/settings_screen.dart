@@ -4,6 +4,7 @@ import '../config/backend_config.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/scan_provider.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/premium_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
@@ -26,6 +27,8 @@ class SettingsScreen extends StatelessWidget {
           _buildProSection(context),
           const SizedBox(height: 24),
           _buildVehicleSection(context),
+          const SizedBox(height: 24),
+          const _NotificationsSection(),
           const SizedBox(height: 24),
           _buildDataSection(context),
           const SizedBox(height: 24),
@@ -550,6 +553,195 @@ class SettingsScreen extends StatelessWidget {
             child: const Text('Clear All', style: TextStyle(color: AppTheme.warning)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Notifications section (StatefulWidget for async permission state) ─────────
+
+class _NotificationsSection extends StatefulWidget {
+  const _NotificationsSection();
+
+  @override
+  State<_NotificationsSection> createState() => _NotificationsSectionState();
+}
+
+class _NotificationsSectionState extends State<_NotificationsSection> {
+  bool? _hasPermission;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    final granted = await NotificationService.hasPermission;
+    if (mounted) setState(() => _hasPermission = granted);
+  }
+
+  Future<void> _requestPermission() async {
+    final granted = await NotificationService.requestPermission();
+    if (mounted) setState(() => _hasPermission = granted);
+  }
+
+  static const _purple = Color(0xFF9C6FFF);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'NOTIFICATIONS',
+          style: TextStyle(
+              color: AppTheme.chromeAccent,
+              fontSize: 11,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              // Permission status tile
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (_hasPermission == true
+                            ? AppTheme.success
+                            : AppTheme.warning)
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    _hasPermission == true
+                        ? Icons.notifications_active_outlined
+                        : Icons.notifications_off_outlined,
+                    color: _hasPermission == true
+                        ? AppTheme.success
+                        : AppTheme.warning,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  _hasPermission == null
+                      ? 'Checking permissions…'
+                      : _hasPermission!
+                          ? 'Notifications Enabled'
+                          : 'Notifications Disabled',
+                  style: const TextStyle(
+                      color: AppTheme.textPrimary, fontSize: 14),
+                ),
+                subtitle: Text(
+                  _hasPermission == true
+                      ? 'Maintenance reminders are active'
+                      : 'Tap to enable reminders',
+                  style: const TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 12),
+                ),
+                trailing: _hasPermission == false
+                    ? TextButton(
+                        onPressed: _requestPermission,
+                        child: const Text('Enable',
+                            style: TextStyle(
+                                color: AppTheme.electricBlue,
+                                fontWeight: FontWeight.w600)),
+                      )
+                    : null,
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+
+              // Test notification buttons
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TEST REMINDERS',
+                      style: TextStyle(
+                          color: AppTheme.chromeAccent,
+                          fontSize: 10,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _testChip('Oil Change', Icons.opacity_rounded,
+                            NotificationService.oilChangeReminder),
+                        _testChip('Battery', Icons.battery_alert_rounded,
+                            NotificationService.batteryWarning),
+                        _testChip('Tire Check', Icons.tire_repair_rounded,
+                            NotificationService.tireInspectionReminder),
+                        _testChip('Streak', Icons.local_fire_department_rounded,
+                            NotificationService.streakReminder),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tap a chip to fire a test notification immediately.',
+                      style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          height: 1.4),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _testChip(String label, IconData icon, Future<void> Function() onTap) {
+    return GestureDetector(
+      onTap: () async {
+        if (_hasPermission != true) {
+          final granted = await NotificationService.requestPermission();
+          if (mounted) setState(() => _hasPermission = granted);
+          if (!granted) return;
+        }
+        await onTap();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$label notification sent!'),
+              backgroundColor: _purple,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: _purple.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _purple.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: _purple, size: 14),
+            const SizedBox(width: 5),
+            Text(label,
+                style: const TextStyle(
+                    color: _purple, fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }

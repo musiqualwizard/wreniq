@@ -2,6 +2,11 @@
     <!-- Network access — required for all backend API calls -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Push notifications (required on Android 13 / API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Allows scheduled notifications to survive device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <!-- Camera and photo library access for image_picker -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
