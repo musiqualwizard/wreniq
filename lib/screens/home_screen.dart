@@ -4,18 +4,23 @@ import '../models/scan_result.dart';
 import '../models/vehicle_health.dart';
 import '../providers/maintenance_provider.dart';
 import '../providers/scan_provider.dart';
+import '../providers/streak_provider.dart';
 import '../providers/vehicle_health_provider.dart';
 import '../providers/vehicle_provider.dart';
 import '../theme/app_theme.dart';
 import 'diy_videos_screen.dart';
+import 'emergency_mode_screen.dart';
 import 'garage_screen.dart';
 import 'live_dashboard_screen.dart';
 import 'maintenance_timeline_screen.dart';
 import 'mechanic_chat_screen.dart';
 import 'obd_screen.dart';
+import 'recall_alerts_screen.dart';
 import 'saved_scans_screen.dart';
 import 'scan_screen.dart';
+import 'scam_detector_screen.dart';
 import 'settings_screen.dart';
+import 'sound_diagnosis_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -37,6 +42,8 @@ class HomeScreen extends StatelessWidget {
                   _buildHealthCard(context),
                   const SizedBox(height: 16),
                   _buildSmartAlerts(context),
+                  const SizedBox(height: 16),
+                  _buildStreakRow(context),
                   const SizedBox(height: 28),
                   _sectionLabel('Quick Actions'),
                   const SizedBox(height: 14),
@@ -49,6 +56,14 @@ class HomeScreen extends StatelessWidget {
                   _buildMaintenanceCard(context),
                   const SizedBox(height: 12),
                   _buildDiyVideosCard(context),
+                  const SizedBox(height: 12),
+                  _buildEmergencyCard(context),
+                  const SizedBox(height: 12),
+                  _buildScamDetectorCard(context),
+                  const SizedBox(height: 12),
+                  _buildSoundDiagnosisCard(context),
+                  const SizedBox(height: 12),
+                  _buildRecallAlertsCard(context),
                   const SizedBox(height: 28),
                   _buildSavingsCard(context),
                   const SizedBox(height: 28),
@@ -618,6 +633,179 @@ class HomeScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  // ── Streak Row ────────────────────────────────────────────────────────────────
+
+  Widget _buildStreakRow(BuildContext context) {
+    return Consumer<StreakProvider>(
+      builder: (context, sp, _) {
+        if (sp.isLoading) return const SizedBox.shrink();
+        final d = sp.data;
+        if (d.currentStreak == 0 && d.totalScans == 0) return const SizedBox.shrink();
+
+        return Row(
+          children: [
+            _statChip(
+              icon: Icons.local_fire_department,
+              label: '${d.currentStreak}-day streak',
+              color: const Color(0xFFFF6B35),
+            ),
+            const SizedBox(width: 8),
+            _statChip(
+              icon: Icons.camera_alt_outlined,
+              label: '${d.totalScans} scan${d.totalScans != 1 ? 's' : ''}',
+              color: AppTheme.electricBlue,
+            ),
+            const SizedBox(width: 8),
+            _statChip(
+              icon: Icons.calendar_today_outlined,
+              label: '${d.totalDaysActive} day${d.totalDaysActive != 1 ? 's' : ''} active',
+              color: const Color(0xFF9C6FFF),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _statChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
+          Text(label,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  // ── Trust + Safety Feature Cards ──────────────────────────────────────────────
+
+  Widget _buildEmergencyCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EmergencyModeScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A0A0A),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: const Color(0xFFFF3B30).withValues(alpha: 0.5)),
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFFFF3B30).withValues(alpha: 0.08),
+              AppTheme.cardColor,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF3B30).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.local_fire_department,
+                  color: Color(0xFFFF3B30), size: 26),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Emergency Mode',
+                      style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
+                  SizedBox(height: 2),
+                  Text('Breakdown help for 7 emergency types',
+                      style: TextStyle(
+                          color: AppTheme.textSecondary, fontSize: 12)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF3B30).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('SOS',
+                  style: TextStyle(
+                      color: Color(0xFFFF3B30),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1)),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios,
+                color: AppTheme.chromeAccent, size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScamDetectorCard(BuildContext context) {
+    return _featureCard(
+      context,
+      icon: Icons.shield_outlined,
+      title: 'Scam Detector',
+      subtitle: 'Analyse repair quotes for overcharging',
+      badge: 'QUOTE',
+      color: AppTheme.success,
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const ScamDetectorScreen())),
+    );
+  }
+
+  Widget _buildSoundDiagnosisCard(BuildContext context) {
+    return _featureCard(
+      context,
+      icon: Icons.hearing,
+      title: 'Sound Diagnosis',
+      subtitle: 'Identify car problems by the noise',
+      badge: 'AI',
+      color: const Color(0xFF9C6FFF),
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const SoundDiagnosisScreen())),
+    );
+  }
+
+  Widget _buildRecallAlertsCard(BuildContext context) {
+    return _featureCard(
+      context,
+      icon: Icons.campaign_outlined,
+      title: 'Recall Alerts',
+      subtitle: 'Check for active recalls on your vehicle',
+      badge: 'RECALL',
+      color: const Color(0xFFFF9500),
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const RecallAlertsScreen())),
     );
   }
 

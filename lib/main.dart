@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/maintenance_provider.dart';
 import 'providers/scan_provider.dart';
+import 'providers/streak_provider.dart';
 import 'providers/vehicle_health_provider.dart';
 import 'providers/vehicle_provider.dart';
 import 'screens/splash_screen.dart';
@@ -39,6 +40,7 @@ class WreniqApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PremiumService()),
         ChangeNotifierProvider(create: (_) => MaintenanceProvider()),
         ChangeNotifierProvider(create: (_) => VehicleHealthProvider()),
+        ChangeNotifierProvider(create: (_) => StreakProvider()),
       ],
       child: MaterialApp(
         title: 'Wreniq',
