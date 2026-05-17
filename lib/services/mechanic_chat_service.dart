@@ -1,21 +1,25 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
+import '../config/backend_config.dart';
 import '../models/chat_message.dart';
 import '../models/scan_result.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MechanicChatService
 //
-// Flutter → POST /api/mechanic-chat → backend → OpenAI text model → reply
-// OpenAI key stays on the backend; never in Flutter.
+// Flutter → POST /api/mechanic-chat → backend → OpenAI → reply
+// OpenAI key lives on the backend only — never in Flutter.
 //
-// Offline / no-backend fallback: returns a static notice string so the UI
-// always gets something meaningful back.
+// Fallback: returns offlineMessage only after a genuine failure
+// (timeout, network error, non-200). Errors are always logged.
 // ─────────────────────────────────────────────────────────────────────────────
 class MechanicChatService {
   static const offlineMessage =
-      'Wreniq AI chat is offline. Start the backend to enable live answers.';
+      'Wreniq AI is not responding right now. '
+      'The backend may be waking up (Render free tier). '
+      'Please wait 30 seconds and try again.';
 
   static Future<String> send({
     required String message,
@@ -23,7 +27,15 @@ class MechanicChatService {
     String? vehicleInfo,
     ScanResult? scan,
   }) async {
-    if (!ApiConfig.hasBackend) return offlineMessage;
+    if (!BackendConfig.hasBackend) {
+      debugPrint('[MechanicChat] hasBackend=false — returning offline message');
+      return offlineMessage;
+    }
+
+    debugPrint('[MechanicChat] baseUrl  : ${BackendConfig.baseUrl}');
+    debugPrint('[MechanicChat] chatUrl  : ${BackendConfig.mechanicChatUrl}');
+    debugPrint('[MechanicChat] timeout  : ${BackendConfig.timeout.inSeconds}s');
+
     try {
       return await _backendSend(
         message:     message,
@@ -31,19 +43,23 @@ class MechanicChatService {
         vehicleInfo: vehicleInfo ?? '',
         scanContext: scan != null ? _scanContext(scan) : '',
       );
-    } catch (_) {
+    } on TimeoutException {
+      debugPrint('[MechanicChat] request timed out after ${BackendConfig.timeout.inSeconds}s');
+      return 'Request timed out. The backend may be cold-starting — please try again in 30 seconds.';
+    } catch (e) {
+      debugPrint('[MechanicChat] error (${e.runtimeType}): $e');
       return offlineMessage;
     }
   }
 
-  // ── Backend call ──────────────────────────────────────────────────────────
+  // ── Backend call ───────────────────────────────────────────────────────────
   static Future<String> _backendSend({
     required String message,
     required List<ChatMessage> history,
     required String vehicleInfo,
     required String scanContext,
   }) async {
-    final uri  = Uri.parse(ApiConfig.mechanicChatUrl);
+    final uri  = Uri.parse(BackendConfig.mechanicChatUrl);
     final body = jsonEncode({
       'message':     message,
       'vehicleInfo': vehicleInfo,
@@ -51,29 +67,49 @@ class MechanicChatService {
       'history':     history.map((m) => m.toOpenAiMessage()).toList(),
     });
 
+    debugPrint('[MechanicChat] POST ${uri.toString()}');
+
     final response = await http
-        .post(uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept':       'application/json',
-            },
-            body: body)
-        .timeout(ApiConfig.requestTimeout);
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept':       'application/json',
+          },
+          body: body,
+        )
+        .timeout(BackendConfig.timeout);
+
+    debugPrint('[MechanicChat] status: ${response.statusCode}');
 
     if (response.statusCode != 200) {
-      throw Exception('Backend chat error ${response.statusCode}');
+      debugPrint('[MechanicChat] non-200 body: ${response.body}');
+      // Surface the backend's error message when available.
+      String detail = 'Backend returned ${response.statusCode}.';
+      try {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        if (json['error'] != null) detail = json['error'].toString();
+      } catch (_) {}
+      throw Exception('[MechanicChat] $detail');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return (data['reply'] as String?) ?? offlineMessage;
+    final reply = data['reply'] as String?;
+    if (reply == null || reply.isEmpty) {
+      debugPrint('[MechanicChat] response body missing "reply" field: ${response.body}');
+      throw Exception('[MechanicChat] Unexpected response shape — no "reply" field.');
+    }
+
+    debugPrint('[MechanicChat] got reply (${reply.length} chars)');
+    return reply;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
   static String _scanContext(ScanResult scan) {
     final parts = <String>[];
     if (scan.partName.isNotEmpty)         parts.add('Part: ${scan.partName}');
     if (scan.repairDifficulty.isNotEmpty) parts.add('Difficulty: ${scan.repairDifficulty}');
-    if (scan.priceRange.isNotEmpty)       parts.add('Price range: ${scan.priceRange}');
+    if (scan.priceEstimate.isNotEmpty)    parts.add('Price range: ${scan.priceEstimate}');
     if (scan.toolsNeeded.isNotEmpty)      parts.add('Tools: ${scan.toolsNeeded.join(', ')}');
     if (scan.fitmentWarning.isNotEmpty)   parts.add('Fitment note: ${scan.fitmentWarning}');
     return parts.join('. ');

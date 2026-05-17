@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/backend_config.dart';
 import '../providers/vehicle_provider.dart';
 import '../providers/scan_provider.dart';
 import '../services/auth_service.dart';
@@ -27,6 +28,8 @@ class SettingsScreen extends StatelessWidget {
           _buildVehicleSection(context),
           const SizedBox(height: 24),
           _buildDataSection(context),
+          const SizedBox(height: 24),
+          _buildBackendSection(context),
           const SizedBox(height: 24),
           _buildAboutSection(),
           const SizedBox(height: 32),
@@ -337,6 +340,50 @@ class SettingsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  // ── Backend ───────────────────────────────────────────────────────────────────
+
+  Widget _buildBackendSection(BuildContext context) {
+    return _sectionCard(
+      title: 'AI Backend',
+      children: [
+        _tile(
+          icon: Icons.cloud_outlined,
+          title: 'Backend URL',
+          subtitle: BackendConfig.baseUrl,
+          color: AppTheme.electricBlue,
+          onTap: null,
+        ),
+        _tile(
+          icon: Icons.network_check_rounded,
+          title: 'Check Connection',
+          subtitle: 'Ping the AI backend to verify it is reachable',
+          color: AppTheme.success,
+          onTap: () => _pingBackend(context),
+        ),
+      ],
+    );
+  }
+
+  void _pingBackend(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pinging backend…'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    final (ok, message) = await BackendConfig.checkHealth();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(ok ? '✓  $message' : '✗  $message'),
+          backgroundColor: ok ? AppTheme.success : AppTheme.warning,
+          duration: const Duration(seconds: 5),
+        ),
+      );
   }
 
   // ── About ─────────────────────────────────────────────────────────────────────

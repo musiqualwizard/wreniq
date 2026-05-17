@@ -32,7 +32,7 @@ const upload = multer({
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'wreniq-backend' });
+  res.json({ ok: true, service: 'Wreniq backend' });
 });
 
 // ── GET /api/search-parts ────────────────────────────────────────────────────
