@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/scan_result.dart';
 import '../services/checklist_service.dart';
@@ -81,17 +82,20 @@ class _RepairGuideScreenState extends State<RepairGuideScreen> {
   // ── Toggle handlers ───────────────────────────────────────────────────────
 
   Future<void> _toggleTool(int i) async {
+    HapticFeedback.lightImpact();
     setState(() =>
         _checkedTools.contains(i) ? _checkedTools.remove(i) : _checkedTools.add(i));
     await ChecklistService.saveCheckedTools(widget.scan.id, _checkedTools);
   }
 
   Future<void> _toggleStep(int i) async {
+    HapticFeedback.lightImpact();
     setState(() =>
         _checkedSteps.contains(i) ? _checkedSteps.remove(i) : _checkedSteps.add(i));
     await ChecklistService.saveCheckedSteps(widget.scan.id, _checkedSteps);
     if (_allDone && !_completionShown) {
       _completionShown = true;
+      HapticFeedback.heavyImpact();
       await Future.delayed(const Duration(milliseconds: 350));
       if (mounted) _showCompletion();
     }

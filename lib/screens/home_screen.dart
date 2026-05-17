@@ -68,6 +68,8 @@ class HomeScreen extends StatelessWidget {
                   _buildSavingsCard(context),
                   const SizedBox(height: 28),
                   _buildRecentScans(context),
+                  const SizedBox(height: 20),
+                  _buildFooterDisclaimer(),
                   const SizedBox(height: 30),
                 ]),
               ),
@@ -1067,6 +1069,46 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  Widget _buildFooterDisclaimer() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: AppTheme.chromeAccent.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  color: AppTheme.chromeAccent, size: 14),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Do NOT use Wreniq while driving. '
+                  'Pull over safely before using any feature.',
+                  style: TextStyle(
+                      color: AppTheme.chromeAccent,
+                      fontSize: 11,
+                      height: 1.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'AI results are for guidance only. Always verify repairs with a certified mechanic. '
+            'Wreniq is not liable for decisions made based on AI analysis.',
+            style: TextStyle(
+                color: AppTheme.textSecondary, fontSize: 11, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _sectionLabel(String text) {
     return Text(

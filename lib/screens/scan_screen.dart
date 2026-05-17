@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../models/vehicle.dart';
@@ -32,6 +33,7 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    HapticFeedback.lightImpact();
     final file = await _picker.pickImage(
       source: source,
       imageQuality: 85,
@@ -45,10 +47,12 @@ class _ScanScreenState extends State<ScanScreen> {
 
     final premium = context.read<PremiumService>();
     if (!premium.canScan) {
+      HapticFeedback.mediumImpact();
       _showUpgradeSheet();
       return;
     }
 
+    HapticFeedback.mediumImpact();
     await premium.incrementScanCount();
     if (!mounted) return;
 

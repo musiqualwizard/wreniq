@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
@@ -102,6 +103,7 @@ class _MechanicChatScreenState extends State<MechanicChatScreen> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isTyping) return;
 
+    HapticFeedback.lightImpact();
     _inputCtrl.clear();
 
     // Snapshot history before adding the new message
@@ -371,18 +373,13 @@ class _MechanicChatScreenState extends State<MechanicChatScreen> {
           const SizedBox(width: 8),
           Container(
             margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
               color: AppTheme.cardColor,
               borderRadius: BorderRadius.circular(18).copyWith(
                   bottomLeft: const Radius.circular(4)),
             ),
-            child: const SizedBox(
-              width: 36,
-              height: 14,
-              child: CircularProgressIndicator(
-                  color: AppTheme.electricBlue, strokeWidth: 2),
-            ),
+            child: const _TypingDots(),
           ),
         ],
       ),
@@ -474,6 +471,70 @@ class _MechanicChatScreenState extends State<MechanicChatScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Animated typing dots ──────────────────────────────────────────────────────
+
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            // Stagger each dot by 0.2 of the cycle
+            final phase = ((_ctrl.value - i * 0.2) % 1.0);
+            final scale = phase < 0.5
+                ? 1.0 + (phase / 0.5) * 0.5
+                : 1.5 - ((phase - 0.5) / 0.5) * 0.5;
+            final opacity = 0.4 + (scale - 1.0) * 1.2;
+            return Padding(
+              padding: EdgeInsets.only(right: i < 2 ? 5 : 0),
+              child: Transform.scale(
+                scale: scale.clamp(1.0, 1.5),
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.electricBlue
+                        .withValues(alpha: opacity.clamp(0.4, 1.0)),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
