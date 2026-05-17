@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Wreniq — App Launcher Icon Configuration
+# Run:  dart run flutter_launcher_icons
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Image requirements
+# ──────────────────
+# assets/icon/icon.png
+#   • 1024 × 1024 px, PNG
+#   • Full icon with background (used for iOS, legacy Android, Windows)
+#   • No rounded corners — the OS applies the mask shape automatically
+#
+# assets/icon/icon_foreground.png   ← OPTIONAL but recommended
+#   • 1024 × 1024 px, PNG with TRANSPARENT background
+#   • Place the Wreniq logo/symbol centred inside a ~660 × 660 px safe zone
+#     (leaving ~182 px clear on each side so Android's circular/squircle mask
+#     never clips your artwork)
+#   • Used only for the Android adaptive icon foreground layer
+#   • If you only have icon.png, remove the adaptive_icon_foreground line and
+#     the tool will use the full icon as the foreground layer instead
+
+flutter_launcher_icons:
+  # ── Android ────────────────────────────────────────────────────────────────
+  android: "launcher_icon"        # output filename in mipmap dirs
+  min_sdk_android: 21             # enables adaptive icon generation
+
+  # Adaptive icon layers (Android 8.0+)
+  # Background: solid Wreniq dark-blue — the icon "breathes" against this colour
+  adaptive_icon_background: "#0A1628"
+  # Foreground: transparent-background version of the logo
+  # → change to "assets/icon/icon.png" if you don't have a separate foreground
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+
+  # ── iOS ────────────────────────────────────────────────────────────────────
+  ios: true
+  image_path_ios: "assets/icon/icon.png"
+
+  # ── Shared fallback (legacy Android < 8, etc.) ────────────────────────────
+  image_path: "assets/icon/icon.png"
+
+  # ── Disable unused platforms ───────────────────────────────────────────────
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
+  linux:
+    generate: false

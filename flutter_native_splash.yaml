@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Wreniq — Splash Screen Configuration
+# Run:  dart run flutter_native_splash:create
+# Undo: dart run flutter_native_splash:remove
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Image requirements
+# ──────────────────
+# assets/splash/splash.png
+#   • 1152 × 1152 px, PNG
+#   • Place the Wreniq logo/wordmark centred in a ~768 × 768 px safe zone
+#     (the outer ~192 px on each side is clipped on Android 12's circular crop)
+#   • Use a TRANSPARENT or #0A1628 background so it blends with the solid fill
+#   • Same file is reused for pre-12 Android (shown as a centred image over the
+#     background colour) and Android 12+ (shown as the circular launch icon)
+
+flutter_native_splash:
+
+  # ── Background colour ───────────────────────────────────────────────────────
+  # Wreniq primary dark-blue — no white flash on any Android version
+  color: "#0A1628"
+  color_dark: "#0A1628"          # dark-mode devices get the same colour
+
+  # ── Branding image ──────────────────────────────────────────────────────────
+  image: assets/splash/splash.png
+  image_dark: assets/splash/splash.png    # identical for Wreniq (dark-only app)
+
+  # ── Platform targets ────────────────────────────────────────────────────────
+  android: true
+  ios: true
+  web: false
+
+  # ── Full-screen (no status-bar white strip on launch) ───────────────────────
+  fullscreen: true
+
+  # ── Android 12 splash screen API ────────────────────────────────────────────
+  # Android 12+ uses the new SplashScreen API.  These settings control the
+  # animated icon shown in the centre of the launch animation.
+  android_12:
+    image: assets/splash/splash.png
+    color: "#0A1628"                       # window background behind the icon
+    icon_background_color: "#0A1628"       # circle behind the icon (match bg)
+
+    # Dark-mode equivalents (same for Wreniq — always dark)
+    image_dark: assets/splash/splash.png
+    color_dark: "#0A1628"
+    icon_background_color_dark: "#0A1628"

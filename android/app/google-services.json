@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1012207625893",
+    "project_id": "wreniq-906a6",
+    "storage_bucket": "wreniq-906a6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1012207625893:android:a3abc600ccd1ea36188f4c",
+        "android_client_info": {
+          "package_name": "com.digiscope.wreniq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIctfL5Az13IanjxtMdaijOO36EsPXKY4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
