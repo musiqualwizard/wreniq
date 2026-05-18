@@ -57,6 +57,29 @@ app.get('/api/test-ai', (_req, res) => {
   });
 });
 
+// ── GET /api/mechanic-chat-test ───────────────────────────────────────────────
+// Live smoke-test: makes a real OpenAI call to verify the full AI pipeline.
+app.get('/api/mechanic-chat-test', async (_req, res) => {
+  const keyOk = !!(
+    process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY !== 'put_your_key_here'
+  );
+  if (!keyOk) {
+    return res.status(503).json({ success: false, error: 'OPENAI_API_KEY not configured.' });
+  }
+  try {
+    const completion = await openai.chat.completions.create({
+      model:      'gpt-4o-mini',
+      messages:   [{ role: 'user', content: 'Say Wreniq AI is online.' }],
+      max_tokens: 50,
+    });
+    const reply = completion.choices?.[0]?.message?.content?.trim() || 'No response';
+    return res.json({ success: true, reply });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message || 'OpenAI error' });
+  }
+});
+
 // ── GET /api/search-parts ────────────────────────────────────────────────────
 // Query params: year, make, model, engine, partName, suggestedSearchTerms
 //
@@ -205,7 +228,10 @@ app.post('/api/mechanic-chat', async (req, res) => {
   // ── Validate body ───────────────────────────────────────────────────────────
   console.log(`[mechanic-chat] body keys received: ${Object.keys(req.body || {}).join(', ') || '(none)'}`);
 
-  const { message, vehicleInfo = '', scanContext = '', history = [] } = req.body;
+  const message     = req.body.message || req.body.userMessage || req.body.prompt;
+  const vehicleInfo = req.body.vehicleInfo || req.body.vehicle || '';
+  const scanContext = req.body.scanContext || req.body.scanResult || '';
+  const history     = req.body.history || [];
 
   console.log(`[mechanic-chat] message exists: ${!!(message && typeof message === 'string' && message.trim())}`);
 

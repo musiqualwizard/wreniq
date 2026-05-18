@@ -60,16 +60,10 @@ class MechanicChatService {
     required String scanContext,
   }) async {
     final uri  = Uri.parse(BackendConfig.mechanicChatUrl);
-    final body = jsonEncode({
-      'message':     message,
-      'vehicleInfo': vehicleInfo,
-      'scanContext': scanContext,
-      'history':     history.map((m) => m.toOpenAiMessage()).toList(),
-    });
+    final body = jsonEncode({'message': message});
 
     debugPrint('[MechanicChat] POST ${uri.toString()}');
-    debugPrint('[MechanicChat] req  : message(${message.length}c) vehicleInfo(${vehicleInfo.length}c) scanContext(${scanContext.length}c) history(${history.length})');
-    debugPrint('[MechanicChat] body : ${body.length} bytes');
+    debugPrint('[MechanicChat] body : ${body.length} bytes — message(${message.length}c)');
 
     final response = await http
         .post(
@@ -86,7 +80,6 @@ class MechanicChatService {
     debugPrint('[MechanicChat] body    : ${response.body}');
 
     if (response.statusCode != 200) {
-      // Surface the backend's error message when available.
       String detail = 'Backend returned ${response.statusCode}.';
       try {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -97,6 +90,13 @@ class MechanicChatService {
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (data['success'] == false) {
+      final err = data['error']?.toString() ?? 'Unknown backend error';
+      debugPrint('[MechanicChat] ERROR (success:false): $err');
+      throw Exception('[MechanicChat] $err');
+    }
+
     final reply = data['reply'] as String?;
     if (reply == null || reply.isEmpty) {
       debugPrint('[MechanicChat] ERROR   : response has no "reply" field');
