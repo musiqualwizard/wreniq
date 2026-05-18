@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(git -C D:/wreniq add lib/models/diy_video.dart lib/models/vehicle_health.dart lib/models/maintenance_event.dart lib/services/diy_video_service.dart lib/services/vehicle_health_service.dart lib/services/maintenance_service.dart lib/providers/maintenance_provider.dart lib/providers/vehicle_health_provider.dart lib/screens/diy_videos_screen.dart lib/screens/maintenance_timeline_screen.dart lib/screens/results_screen.dart lib/screens/home_screen.dart lib/main.dart)",
+      "Bash(git -C D:/wreniq status --short)",
+      "Bash(flutter analyze *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
