@@ -10,7 +10,13 @@ const app  = express();
 const port = process.env.PORT || 5050;
 
 // ── OpenAI client ────────────────────────────────────────────────────────────
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// 60s timeout — prevents hanging on Render free-tier cold starts.
+// maxRetries: 0 — let Flutter handle retry logic; duplicate retries waste tokens.
+const openai = new OpenAI({
+  apiKey:     process.env.OPENAI_API_KEY,
+  timeout:    60_000,
+  maxRetries: 0,
+});
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
@@ -33,6 +39,22 @@ const upload = multer({
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'Wreniq backend' });
+});
+
+// ── GET /api/test-ai ──────────────────────────────────────────────────────────
+// Quick smoke-test: confirms route is reachable and key is present.
+// Does NOT make an OpenAI call (no token spend).
+app.get('/api/test-ai', (_req, res) => {
+  const keyPresent = !!(
+    process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY !== 'put_your_key_here'
+  );
+  res.json({
+    success:   true,
+    message:   'AI route operational',
+    keyLoaded: keyPresent,
+    model:     'gpt-4o-mini',
+  });
 });
 
 // ── GET /api/search-parts ────────────────────────────────────────────────────
@@ -162,16 +184,38 @@ app.get('/api/search-parts', (req, res) => {
 //
 // Uses gpt-4o-mini — fast and cost-effective for conversational repair guidance.
 app.post('/api/mechanic-chat', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'put_your_key_here') {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured on server.' });
+  const start = Date.now();
+  const ts    = new Date().toISOString();
+
+  // ── Key guard ───────────────────────────────────────────────────────────────
+  const keyOk = !!(
+    process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY !== 'put_your_key_here'
+  );
+  console.log(`[mechanic-chat] ${ts} | key_loaded=${keyOk}`);
+
+  if (!keyOk) {
+    console.error('[mechanic-chat] Rejected — OPENAI_API_KEY is missing or placeholder.');
+    return res.status(503).json({
+      success: false,
+      error:   'OPENAI_API_KEY not configured on server. Set it in the Render environment variables.',
+    });
   }
 
+  // ── Validate body ───────────────────────────────────────────────────────────
   const { message, vehicleInfo = '', scanContext = '', history = [] } = req.body;
 
   if (!message || typeof message !== 'string' || !message.trim()) {
-    return res.status(400).json({ error: 'message field is required.' });
+    return res.status(400).json({ success: false, error: 'message field is required.' });
   }
 
+  console.log(
+    `[mechanic-chat] ${ts} | msg_len=${message.trim().length}` +
+    ` | vehicle=${vehicleInfo ? 'yes' : 'no'}` +
+    ` | history=${history.length} turns`
+  );
+
+  // ── Build messages ──────────────────────────────────────────────────────────
   const systemPrompt = buildChatSystemPrompt(vehicleInfo, scanContext);
 
   // Sanitise history: keep only role/content, cap at last 20 turns to limit tokens
@@ -186,6 +230,9 @@ app.post('/api/mechanic-chat', async (req, res) => {
     { role: 'user',   content: message.trim() },
   ];
 
+  // ── OpenAI call ─────────────────────────────────────────────────────────────
+  console.log(`[mechanic-chat] Calling OpenAI gpt-4o-mini — ${messages.length} messages...`);
+
   try {
     const completion = await openai.chat.completions.create({
       model:      'gpt-4o-mini',
@@ -193,15 +240,42 @@ app.post('/api/mechanic-chat', async (req, res) => {
       max_tokens: 800,
     });
 
+    const elapsed = Date.now() - start;
+    const tokens  = completion.usage?.total_tokens ?? 'N/A';
+    console.log(`[mechanic-chat] OpenAI OK — ${elapsed}ms | tokens=${tokens}`);
+
     const reply = completion.choices?.[0]?.message?.content?.trim()
       || 'I could not generate a response. Please try again.';
 
-    return res.json({ reply });
+    return res.json({ success: true, reply });
+
   } catch (err) {
-    const status = err.status || 500;
-    if (status === 401) return res.status(401).json({ error: 'Invalid OpenAI API key.' });
-    if (status === 429) return res.status(429).json({ error: 'Rate limit reached. Try again shortly.' });
-    return res.status(status).json({ error: `OpenAI error: ${err.message || 'Unknown error'}` });
+    const elapsed = Date.now() - start;
+    const status  = err.status || 500;
+
+    console.error(
+      `[mechanic-chat] OpenAI FAILED — ${elapsed}ms` +
+      ` | status=${status}` +
+      ` | type=${err.type || 'N/A'}` +
+      ` | code=${err.code || 'N/A'}` +
+      ` | message=${err.message || 'unknown'}`
+    );
+
+    if (status === 401) {
+      return res.status(401).json({ success: false, error: 'Invalid OpenAI API key. Check the key set in Render environment variables.' });
+    }
+    if (status === 429) {
+      return res.status(429).json({ success: false, error: 'OpenAI rate limit reached. Try again in a moment.' });
+    }
+    if (err.code === 'ETIMEDOUT' || err.name === 'APIConnectionTimeoutError') {
+      return res.status(504).json({ success: false, error: 'OpenAI request timed out (60s). Try again.' });
+    }
+    return res.status(status).json({
+      success:   false,
+      error:     `OpenAI error: ${err.message || 'Unknown error'}`,
+      errorType: err.type  || 'api_error',
+      errorCode: err.code  || null,
+    });
   }
 });
 
@@ -397,8 +471,18 @@ function normaliseScanResult(json, vehicleInfo) {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(port, () => {
+  const keyPresent = !!(
+    process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY !== 'put_your_key_here'
+  );
+  const keyLen = keyPresent ? process.env.OPENAI_API_KEY.length : 0;
+
+  console.log('─────────────────────────────────────────');
   console.log(`Wreniq backend running on port ${port}`);
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'put_your_key_here') {
-    console.warn('  WARNING: OPENAI_API_KEY not set — scan-part endpoint will return 503');
+  console.log(`OpenAI key loaded: ${keyPresent}${keyPresent ? ` (length: ${keyLen})` : ''}`);
+  if (!keyPresent) {
+    console.error('  *** OPENAI_API_KEY is missing or still set to placeholder. ***');
+    console.error('  *** Set it in Render → Environment Variables.              ***');
   }
+  console.log('─────────────────────────────────────────');
 });

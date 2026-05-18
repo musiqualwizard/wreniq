@@ -80,27 +80,28 @@ class MechanicChatService {
         )
         .timeout(BackendConfig.timeout);
 
-    debugPrint('[MechanicChat] status: ${response.statusCode}');
+    debugPrint('[MechanicChat] status  : ${response.statusCode}');
+    debugPrint('[MechanicChat] body    : ${response.body}');
 
     if (response.statusCode != 200) {
-      debugPrint('[MechanicChat] non-200 body: ${response.body}');
       // Surface the backend's error message when available.
       String detail = 'Backend returned ${response.statusCode}.';
       try {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         if (json['error'] != null) detail = json['error'].toString();
       } catch (_) {}
+      debugPrint('[MechanicChat] ERROR   : $detail');
       throw Exception('[MechanicChat] $detail');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final reply = data['reply'] as String?;
     if (reply == null || reply.isEmpty) {
-      debugPrint('[MechanicChat] response body missing "reply" field: ${response.body}');
+      debugPrint('[MechanicChat] ERROR   : response has no "reply" field');
       throw Exception('[MechanicChat] Unexpected response shape — no "reply" field.');
     }
 
-    debugPrint('[MechanicChat] got reply (${reply.length} chars)');
+    debugPrint('[MechanicChat] reply   : ${reply.length} chars received');
     return reply;
   }
 
