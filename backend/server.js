@@ -203,9 +203,14 @@ app.post('/api/mechanic-chat', async (req, res) => {
   }
 
   // ── Validate body ───────────────────────────────────────────────────────────
+  console.log(`[mechanic-chat] body keys received: ${Object.keys(req.body || {}).join(', ') || '(none)'}`);
+
   const { message, vehicleInfo = '', scanContext = '', history = [] } = req.body;
 
+  console.log(`[mechanic-chat] message exists: ${!!(message && typeof message === 'string' && message.trim())}`);
+
   if (!message || typeof message !== 'string' || !message.trim()) {
+    console.error('[mechanic-chat] Rejected — message field missing or empty');
     return res.status(400).json({ success: false, error: 'message field is required.' });
   }
 
@@ -247,6 +252,7 @@ app.post('/api/mechanic-chat', async (req, res) => {
     const reply = completion.choices?.[0]?.message?.content?.trim()
       || 'I could not generate a response. Please try again.';
 
+    console.log(`[mechanic-chat] sending: success=true reply_len=${reply.length}`);
     return res.json({ success: true, reply });
 
   } catch (err) {

@@ -68,6 +68,8 @@ class MechanicChatService {
     });
 
     debugPrint('[MechanicChat] POST ${uri.toString()}');
+    debugPrint('[MechanicChat] req  : message(${message.length}c) vehicleInfo(${vehicleInfo.length}c) scanContext(${scanContext.length}c) history(${history.length})');
+    debugPrint('[MechanicChat] body : ${body.length} bytes');
 
     final response = await http
         .post(
