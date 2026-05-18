@@ -57,29 +57,6 @@ app.get('/api/test-ai', (_req, res) => {
   });
 });
 
-// ── GET /api/mechanic-chat-test ───────────────────────────────────────────────
-// Live smoke-test: makes a real OpenAI call to verify the full AI pipeline.
-app.get('/api/mechanic-chat-test', async (_req, res) => {
-  const keyOk = !!(
-    process.env.OPENAI_API_KEY &&
-    process.env.OPENAI_API_KEY !== 'put_your_key_here'
-  );
-  if (!keyOk) {
-    return res.status(503).json({ success: false, error: 'OPENAI_API_KEY not configured.' });
-  }
-  try {
-    const completion = await openai.chat.completions.create({
-      model:      'gpt-4o-mini',
-      messages:   [{ role: 'user', content: 'Say Wreniq AI is online.' }],
-      max_tokens: 50,
-    });
-    const reply = completion.choices?.[0]?.message?.content?.trim() || 'No response';
-    return res.json({ success: true, reply });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message || 'OpenAI error' });
-  }
-});
-
 // ── GET /api/search-parts ────────────────────────────────────────────────────
 // Query params: year, make, model, engine, partName, suggestedSearchTerms
 //
