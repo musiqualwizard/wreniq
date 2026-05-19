@@ -1,27 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../models/scan_result.dart';
-import 'mock_ai_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ScanAnalysis — wrapper returned by AiScanService.analyze()
-//
-// Carries the result AND whether mock mode was used, so the UI can show
-// the appropriate banner without polluting ScanResult itself.
 // ─────────────────────────────────────────────────────────────────────────────
 class ScanAnalysis {
   final ScanResult result;
-  final bool wasMock;
-  final String? fallbackReason; // non-null when backend failed and mock was used
 
-  const ScanAnalysis({
-    required this.result,
-    required this.wasMock,
-    this.fallbackReason,
-  });
+  const ScanAnalysis({required this.result});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,9 +53,6 @@ class _BadResponseException extends _AiScanException {
 // AiScanService
 // ─────────────────────────────────────────────────────────────────────────────
 class AiScanService {
-  // Routing logic:
-  //   ApiConfig.hasBackend == false  →  mock always
-  //   ApiConfig.hasBackend == true   →  POST to backend, fallback to mock on error
   static Future<ScanAnalysis> analyze({
     required String imagePath,
     required String year,
@@ -72,44 +60,18 @@ class AiScanService {
     required String model,
     required String trim,
   }) async {
-    if (!ApiConfig.hasBackend) {
-      final result = await MockAiService.analyze(
-        imagePath: imagePath,
-        year: year,
-        make: make,
-        model: model,
-        trim: trim,
-      );
-      return ScanAnalysis(result: result, wasMock: true);
-    }
+    debugPrint('[AiScanService] analyze → ${ApiConfig.backendUrl}');
+    debugPrint('[AiScanService] vehicle: $year $make $model $trim');
 
-    // ── Live path — call backend proxy ───────────────────────────────────────
-    try {
-      final result = await _backendAnalyze(
-        imagePath: imagePath,
-        year:      year,
-        make:      make,
-        model:     model,
-        trim:      trim,
-      );
-      return ScanAnalysis(result: result, wasMock: false);
-    } on _AiScanException {
-      rethrow; // ScanProvider shows a proper error snackbar for these
-    } catch (e) {
-      // Unexpected error — fall back to mock so the user still gets a result
-      final result = await MockAiService.analyze(
-        imagePath: imagePath,
-        year: year,
-        make: make,
-        model: model,
-        trim: trim,
-      );
-      return ScanAnalysis(
-        result:         result,
-        wasMock:        true,
-        fallbackReason: 'backend not connected.',
-      );
-    }
+    // ── Live path — always call the production backend ───────────────────────
+    final result = await _backendAnalyze(
+      imagePath: imagePath,
+      year:      year,
+      make:      make,
+      model:     model,
+      trim:      trim,
+    );
+    return ScanAnalysis(result: result);
   }
 
   // ── Backend proxy call ────────────────────────────────────────────────────
@@ -143,6 +105,7 @@ class AiScanService {
     // 3. Send with timeout
     final http.StreamedResponse streamed;
     try {
+      debugPrint('[AiScanService] POST ${uri.toString()}');
       streamed = await request.send().timeout(ApiConfig.requestTimeout);
     } on SocketException {
       throw const _NoInternetException();
@@ -151,6 +114,7 @@ class AiScanService {
     }
 
     final response = await http.Response.fromStream(streamed);
+    debugPrint('[AiScanService] response status: ${response.statusCode}');
 
     // 4. Handle HTTP errors
     if (response.statusCode == 401) {

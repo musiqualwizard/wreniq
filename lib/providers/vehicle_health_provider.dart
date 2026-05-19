@@ -4,7 +4,7 @@ import '../models/scan_result.dart';
 import '../services/vehicle_health_service.dart';
 
 class VehicleHealthProvider extends ChangeNotifier {
-  VehicleHealth _health = VehicleHealthService.demo();
+  VehicleHealth _health = VehicleHealthService.calculate();
 
   VehicleHealth  get health => _health;
   int            get score  => _health.score;
@@ -31,8 +31,4 @@ class VehicleHealthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void resetToDemo() {
-    _health = VehicleHealthService.demo();
-    notifyListeners();
-  }
 }

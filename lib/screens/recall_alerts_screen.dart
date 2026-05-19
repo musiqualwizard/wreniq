@@ -6,64 +6,99 @@ import '../providers/vehicle_provider.dart';
 import '../services/recall_service.dart';
 import '../theme/app_theme.dart';
 
-class RecallAlertsScreen extends StatelessWidget {
+class RecallAlertsScreen extends StatefulWidget {
   const RecallAlertsScreen({super.key});
 
   @override
+  State<RecallAlertsScreen> createState() => _RecallAlertsScreenState();
+}
+
+class _RecallAlertsScreenState extends State<RecallAlertsScreen> {
+  late Future<List<RecallAlert>> _future;
+  String _year = '', _make = '', _model = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final vp = context.read<VehicleProvider>();
+    final v  = vp.vehicle;
+    _year  = v?.year  ?? '';
+    _make  = v?.make  ?? '';
+    _model = v?.model ?? '';
+    _load();
+  }
+
+  void _load() {
+    if (_year.isEmpty || _make.isEmpty || _model.isEmpty) {
+      _future = Future.value([]);
+    } else {
+      _future = RecallService.fetchRecalls(
+          year: _year, make: _make, model: _model);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer<VehicleProvider>(
-      builder: (context, vp, _) {
-        final vehicle = vp.vehicle;
-        final year  = vehicle?.year  ?? '';
-        final make  = vehicle?.make  ?? '';
-        final model = vehicle?.model ?? '';
+    final vehicle = context.watch<VehicleProvider>().vehicle;
 
-        final recalls = vehicle != null
-            ? RecallService.getMockRecalls(year: year, make: make, model: model)
-            : RecallService.getMockRecalls(
-                year: '2017', make: 'Toyota', model: 'Camry');
-
-        return Scaffold(
-          appBar: AppBar(title: const Text('RECALL ALERTS')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _vehicleCard(vehicle, year, make, model),
-                const SizedBox(height: 14),
-                _mockDisclaimer(),
-                const SizedBox(height: 20),
-                _sectionLabel('ACTIVE RECALLS'),
-                const SizedBox(height: 12),
-                if (recalls.isEmpty)
-                  _emptyState()
-                else
-                  ...recalls.map(_recallCard),
-                const SizedBox(height: 20),
-                _nhtsaButton(
-                    context: context,
-                    year: year.isEmpty ? '2017' : year,
-                    make: make.isEmpty ? 'Toyota' : make,
-                    model: model.isEmpty ? 'Camry' : model),
-                const SizedBox(height: 16),
-                _disclaimerCard(),
-              ],
-            ),
-          ),
-        );
-      },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('RECALL ALERTS'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _vehicleCard(vehicle),
+            const SizedBox(height: 14),
+            if (vehicle == null)
+              _noVehicleState()
+            else
+              FutureBuilder<List<RecallAlert>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return _loadingState();
+                  }
+                  if (snap.hasError) {
+                    return _errorState(snap.error.toString());
+                  }
+                  final recalls = snap.data ?? [];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sectionLabel('ACTIVE RECALLS'),
+                      const SizedBox(height: 12),
+                      if (recalls.isEmpty)
+                        _emptyState()
+                      else
+                        ...recalls.map(_recallCard),
+                      const SizedBox(height: 20),
+                      _nhtsaButton(context),
+                      const SizedBox(height: 16),
+                      _disclaimerCard(),
+                    ],
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _vehicleCard(dynamic vehicle, String year, String make, String model) {
+  Widget _vehicleCard(dynamic vehicle) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.circular(14),
-        border:
-            Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3)),
+        border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -82,7 +117,9 @@ class RecallAlertsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  vehicle != null ? '$year $make $model' : 'Demo Vehicle',
+                  vehicle != null
+                      ? '$_year $_make $_model'
+                      : 'No vehicle set',
                   style: const TextStyle(
                       color: AppTheme.textPrimary,
                       fontWeight: FontWeight.bold,
@@ -91,8 +128,8 @@ class RecallAlertsScreen extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   vehicle != null
-                      ? 'Showing recalls for your vehicle'
-                      : '2017 Toyota Camry (no vehicle set)',
+                      ? 'Checking NHTSA for active recalls'
+                      : 'Add a vehicle to check for recalls',
                   style: const TextStyle(
                       color: AppTheme.textSecondary, fontSize: 12),
                 ),
@@ -104,29 +141,102 @@ class RecallAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _mockDisclaimer() {
+  Widget _noVehicleState() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFFF9500).withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border:
-            Border.all(color: const Color(0xFFFF9500).withValues(alpha: 0.3)),
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: const Column(
         children: [
-          Icon(Icons.science_outlined,
-              color: Color(0xFFFF9500), size: 16),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'DEMO DATA — These are sample recalls for illustration purposes. '
-              'Tap "Check on NHTSA" below for real, live recall data for your vehicle.',
+          Icon(Icons.directions_car_outlined,
+              color: AppTheme.chromeAccent, size: 44),
+          SizedBox(height: 12),
+          Text('No vehicle set',
               style: TextStyle(
-                  color: Color(0xFFFF9500), fontSize: 12, height: 1.4),
-            ),
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16)),
+          SizedBox(height: 4),
+          Text('Add your vehicle in My Garage to check for active recalls.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _loadingState() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 48),
+      child: Center(
+        child: Column(
+          children: [
+            CircularProgressIndicator(color: AppTheme.electricBlue),
+            SizedBox(height: 16),
+            Text('Checking NHTSA for recalls…',
+                style: TextStyle(color: AppTheme.chromeAccent, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _errorState(String message) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.wifi_off, color: AppTheme.warning, size: 36),
+          const SizedBox(height: 10),
+          const Text('Unable to load recalls',
+              style: TextStyle(
+                  color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 12)),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => setState(() => _load()),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Retry'),
           ),
+          const SizedBox(height: 8),
+          _nhtsaButton(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.verified_outlined, color: AppTheme.success, size: 40),
+          const SizedBox(height: 8),
+          const Text('No active recalls found',
+              style: TextStyle(
+                  color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          const Text('No NHTSA recalls found for this vehicle.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+          const SizedBox(height: 16),
+          _nhtsaButton(context),
         ],
       ),
     );
@@ -148,8 +258,7 @@ class RecallAlertsScreen extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
@@ -183,7 +292,9 @@ class RecallAlertsScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Text(recall.description,
               style: const TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  height: 1.4),
               maxLines: 3,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 8),
@@ -212,39 +323,12 @@ class RecallAlertsScreen extends StatelessWidget {
     );
   }
 
-  Widget _emptyState() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.verified_outlined, color: AppTheme.success, size: 40),
-          SizedBox(height: 8),
-          Text('No sample recalls for this vehicle year',
-              style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w600)),
-          SizedBox(height: 4),
-          Text('Verify on NHTSA for the most accurate data',
-              style:
-                  TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-        ],
-      ),
+  Widget _nhtsaButton(BuildContext context) {
+    final url = RecallService.nhtsaSearchUrl(
+      year:  _year.isEmpty  ? '2020' : _year,
+      make:  _make.isEmpty  ? 'TOYOTA' : _make,
+      model: _model.isEmpty ? 'CAMRY' : _model,
     );
-  }
-
-  Widget _nhtsaButton({
-    required BuildContext context,
-    required String year,
-    required String make,
-    required String model,
-  }) {
-    final url =
-        RecallService.nhtsaSearchUrl(year: year, make: make, model: model);
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -266,12 +350,12 @@ class RecallAlertsScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: AppTheme.chromeAccent.withValues(alpha: 0.2)),
+        border:
+            Border.all(color: AppTheme.chromeAccent.withValues(alpha: 0.2)),
       ),
       child: const Text(
-        'Recall data shown here is for demonstration only. Always check NHTSA.gov '
-        'or contact your dealer for official, up-to-date recall information.',
+        'Recall data is fetched live from the NHTSA API. '
+        'Always contact your dealer or check NHTSA.gov for the most current information.',
         style: TextStyle(
             color: AppTheme.chromeAccent, fontSize: 11, height: 1.4),
       ),
@@ -279,9 +363,9 @@ class RecallAlertsScreen extends StatelessWidget {
   }
 
   Color _severityColor(RecallSeverity s) => switch (s) {
-        RecallSeverity.safety => const Color(0xFFFF3B30),
+        RecallSeverity.safety    => const Color(0xFFFF3B30),
         RecallSeverity.emissions => const Color(0xFFFF9500),
-        RecallSeverity.defect => AppTheme.electricBlue,
+        RecallSeverity.defect    => AppTheme.electricBlue,
       };
 
   Widget _sectionLabel(String text) => Text(text,

@@ -238,8 +238,8 @@ class _OBDScreenState extends State<OBDScreen> {
     } else {
       color    = AppTheme.chromeAccent;
       icon     = Icons.electrical_services;
-      title    = 'Demo Diagnostics Mode';
-      subtitle = 'Enable Bluetooth and connect an OBD2 adapter for live data.';
+      title    = 'OBD2 Adapter Required';
+      subtitle = 'Enable Bluetooth and connect an OBD2 adapter for live diagnostics.';
     }
 
     return Container(

@@ -10,7 +10,11 @@ import '../providers/vehicle_provider.dart';
 import '../theme/app_theme.dart';
 import 'diy_videos_screen.dart';
 import 'emergency_mode_screen.dart';
+import 'engine_map_screen.dart';
 import 'garage_screen.dart';
+import 'leak_identifier_screen.dart';
+import 'visual_id_screen.dart';
+import 'warning_light_screen.dart';
 import 'live_dashboard_screen.dart';
 import 'maintenance_timeline_screen.dart';
 import 'mechanic_chat_screen.dart';
@@ -48,6 +52,12 @@ class HomeScreen extends StatelessWidget {
                   _sectionLabel('Quick Actions'),
                   const SizedBox(height: 14),
                   _buildActionsGrid(context),
+                  const SizedBox(height: 24),
+                  _sectionLabel('Visual Identification'),
+                  const SizedBox(height: 14),
+                  _buildVisualIdGrid(context),
+                  const SizedBox(height: 12),
+                  _buildEngineMapCard(context),
                   const SizedBox(height: 12),
                   _buildDiagnosticsCard(context),
                   const SizedBox(height: 12),
@@ -257,6 +267,51 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  // ── Visual Identification Grid ────────────────────────────────────────────────
+
+  Widget _buildVisualIdGrid(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.3,
+      children: [
+        _actionCard(context,
+            icon: Icons.search,
+            label: 'Identify Part',
+            sublabel: 'Point & identify',
+            color: const Color(0xFF00D4AA),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const VisualIdScreen()))),
+        _actionCard(context,
+            icon: Icons.warning_amber_outlined,
+            label: 'Warning Light',
+            sublabel: 'Scan dashboard',
+            color: const Color(0xFFFFB800),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const WarningLightScreen()))),
+        _actionCard(context,
+            icon: Icons.help_outline,
+            label: 'What Is This?',
+            sublabel: 'Photo identify',
+            color: AppTheme.electricBlue,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const VisualIdScreen()))),
+        _actionCard(context,
+            icon: Icons.water_drop_outlined,
+            label: 'Leak Scanner',
+            sublabel: 'Identify fluid',
+            color: const Color(0xFFFF6B35),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const LeakIdentifierScreen()))),
+      ],
+    );
+  }
+
+  // ── Engine Map shortcut card — placed inside diagnostics section ──────────────
+
   // ── Vehicle Health Card ───────────────────────────────────────────────────────
 
   Widget _buildHealthCard(BuildContext context) {
@@ -441,16 +496,6 @@ class HomeScreen extends StatelessWidget {
       ));
     }
 
-    // Fallback demo alerts when no real data yet
-    if (list.isEmpty && hp.health.score >= 85) {
-      list.add(const _AlertCard(
-        icon: Icons.check_circle_outline,
-        title: 'All Clear',
-        body: 'No active alerts',
-        color: AppTheme.success,
-      ));
-    }
-
     return list;
   }
 
@@ -556,6 +601,20 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ── Feature Cards ─────────────────────────────────────────────────────────────
+
+  Widget _buildEngineMapCard(BuildContext context) {
+    const teal = Color(0xFF00D4AA);
+    return _featureCard(
+      context,
+      icon: Icons.map_outlined,
+      title: 'Engine Bay Map',
+      subtitle: 'Tap components to identify parts',
+      badge: 'VISUAL',
+      color: teal,
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const EngineMapScreen())),
+    );
+  }
 
   Widget _buildDiagnosticsCard(BuildContext context) {
     const amber = Color(0xFFFF9500);

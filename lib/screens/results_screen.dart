@@ -23,8 +23,6 @@ class ResultsScreen extends StatefulWidget {
 class _ResultsScreenState extends State<ResultsScreen>
     with SingleTickerProviderStateMixin {
   late final ScanResult  _scan;
-  late final bool        _wasMock;
-  late final String?     _fallbackReason;
   late final TabController _tabs;
   bool _isSaved = false;
 
@@ -33,11 +31,9 @@ class _ResultsScreenState extends State<ResultsScreen>
   @override
   void initState() {
     super.initState();
-    final sp    = context.read<ScanProvider>();
-    _scan           = sp.currentResult!;
-    _wasMock        = sp.lastWasMock;
-    _fallbackReason = sp.fallbackReason;
-    _tabs = TabController(length: _tabLabels.length, vsync: this);
+    final sp = context.read<ScanProvider>();
+    _scan    = sp.currentResult!;
+    _tabs    = TabController(length: _tabLabels.length, vsync: this);
   }
 
   @override
@@ -114,8 +110,7 @@ class _ResultsScreenState extends State<ResultsScreen>
         : _scan.confidenceScore >= 0.70
             ? AppTheme.electricBlue
             : AppTheme.warning;
-    final isMock = _wasMock;
-    final bannerColor = isMock ? AppTheme.warning : AppTheme.success;
+    const bannerColor = AppTheme.success;
 
     return Container(
       color: AppTheme.surface,
@@ -218,19 +213,15 @@ class _ResultsScreenState extends State<ResultsScreen>
               ),
               child: Row(
                 children: [
-                  Icon(
-                    isMock ? Icons.info_outline : Icons.check_circle_outline,
+                  const Icon(
+                    Icons.check_circle_outline,
                     color: bannerColor,
                     size: 14,
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
+                  const Expanded(
                     child: Text(
-                      _fallbackReason != null
-                          ? 'Demo result — $_fallbackReason'
-                          : isMock
-                              ? 'Demo result — backend not configured.'
-                              : 'Wreniq AI scan complete.',
+                      'Wreniq AI scan complete.',
                       style: TextStyle(
                           color: bannerColor, fontSize: 11, height: 1.3),
                     ),
