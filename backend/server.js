@@ -367,6 +367,127 @@ app.post('/api/scan-part', upload.single('image'), async (req, res) => {
   }
 });
 
+// ── GET|POST /api/nearby-services ────────────────────────────────────────────
+// Flutter sends: GET ?lat=&lon=&type=&radius=   (radius already in meters)
+// Spec also accepts: POST { lat, lng, type, radius }
+//
+// Env var required: GOOGLE_MAPS_API_KEY
+// Returns: { success, results: [ { name, address, phone, rating, reviewCount,
+//             distanceMiles, isOpen, mapsUrl, placeId, estimatedPriceRange, type } ] }
+
+app.get('/api/nearby-services',  handleNearbyServices);
+app.post('/api/nearby-services', handleNearbyServices);
+
+async function handleNearbyServices(req, res) {
+  const p      = req.method === 'POST' ? req.body : req.query;
+  const lat    = parseFloat(p.lat);
+  const lon    = parseFloat(p.lon ?? p.lng);
+  const type   = (p.type   || 'mechanic').toString().trim();
+  const radius = parseInt(p.radius, 10) || 16093; // default ~10 mi in metres
+
+  if (isNaN(lat) || isNaN(lon)) {
+    return res.status(400).json({ success: false, error: 'Invalid or missing lat/lon.' });
+  }
+  if (radius < 100 || radius > 50000) {
+    return res.status(400).json({ success: false, error: 'Radius must be 100–50000 metres.' });
+  }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    console.error('[nearby-services] GOOGLE_MAPS_API_KEY not set');
+    return res.status(503).json({
+      success: false,
+      error:   'GOOGLE_MAPS_API_KEY not configured on server. Set it in Render → Environment Variables.',
+    });
+  }
+
+  const query  = _nearbyQuery(type);
+  const url    =
+    'https://maps.googleapis.com/maps/api/place/textsearch/json' +
+    `?query=${encodeURIComponent(query)}` +
+    `&location=${lat},${lon}` +
+    `&radius=${radius}` +
+    `&key=${apiKey}`;
+
+  console.log(`[nearby-services] type=${type} radius=${radius}m lat=${lat} lon=${lon}`);
+
+  let data;
+  try {
+    const resp = await fetch(url);
+    data = await resp.json();
+  } catch (err) {
+    console.error('[nearby-services] Places fetch error:', err.message);
+    return res.status(502).json({ success: false, error: 'Failed to reach Google Places API.' });
+  }
+
+  const status = data.status;
+  console.log(`[nearby-services] Places status: ${status}`);
+
+  if (status === 'ZERO_RESULTS') {
+    return res.json({ success: true, results: [] });
+  }
+  if (status !== 'OK') {
+    const msg = data.error_message || status;
+    console.error(`[nearby-services] Places error: ${msg}`);
+    return res.status(502).json({ success: false, error: `Google Places: ${msg}` });
+  }
+
+  const results = (data.results || []).slice(0, 20).map(r => {
+    const rLat = r.geometry?.location?.lat ?? lat;
+    const rLon = r.geometry?.location?.lng ?? lon;
+    return {
+      name:                r.name                          || 'Unknown',
+      address:             r.formatted_address || r.vicinity || '',
+      phone:               null,
+      rating:              r.rating                        ?? null,
+      reviewCount:         r.user_ratings_total            ?? null,
+      distanceMiles:       _haversine(lat, lon, rLat, rLon),
+      isOpen:              r.opening_hours?.open_now       ?? null,
+      mapsUrl:
+        `https://www.google.com/maps/search/?api=1` +
+        `&query=${rLat},${rLon}` +
+        `&query_place_id=${r.place_id || ''}`,
+      placeId:             r.place_id                      || null,
+      estimatedPriceRange: _priceLevel(r.price_level),
+      type,
+    };
+  });
+
+  results.sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+  console.log(`[nearby-services] returning ${results.length} results`);
+  return res.json({ success: true, results });
+}
+
+function _nearbyQuery(type) {
+  const map = {
+    mechanic:    "auto repair mechanic shop car repair",
+    parts_store: "auto parts store AutoZone NAPA O'Reilly",
+    tire_shop:   "tire shop tire repair",
+    dealership:  "car dealership auto dealer",
+    towing:      "towing service tow truck roadside assistance",
+    gas_station: "gas station fuel station",
+    emissions:   "emissions inspection vehicle inspection smog check",
+    car_wash:    "car wash auto detailing",
+  };
+  return map[type] || "auto repair shop";
+}
+
+function _priceLevel(level) {
+  return level != null ? ['Free', '$', '$$', '$$$', '$$$$'][level] ?? null : null;
+}
+
+function _haversine(lat1, lon1, lat2, lon2) {
+  const R    = 3958.8;
+  const dLat = _toRad(lat2 - lat1);
+  const dLon = _toRad(lon2 - lon1);
+  const a    = Math.sin(dLat / 2) ** 2 +
+               Math.cos(_toRad(lat1)) * Math.cos(_toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function _toRad(deg) { return deg * Math.PI / 180; }
+
 // ── Multer error handler (file too large, wrong type) ─────────────────────────
 app.use((err, _req, res, _next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
