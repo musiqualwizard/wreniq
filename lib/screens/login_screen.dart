@@ -86,20 +86,26 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (error != null) {
-      setState(() => _errorMessage = error);
+    if (error == null) {
+      // Success — navigate to home.
+      Navigator.of(context).pushAndRemoveUntil(
+        PageRouteBuilder(
+          pageBuilder: (_, _, _) => const HomeScreen(),
+          transitionDuration: const Duration(milliseconds: 600),
+          transitionsBuilder: (_, anim, _, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+        (_) => false,
+      );
       return;
     }
 
-    Navigator.of(context).pushAndRemoveUntil(
-      PageRouteBuilder(
-        pageBuilder: (_, _, _) => const HomeScreen(),
-        transitionDuration: const Duration(milliseconds: 600),
-        transitionsBuilder: (_, anim, _, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-      (_) => false,
-    );
+    if (error == AuthService.googleCancelled) {
+      setState(() => _errorMessage = 'Google sign-in cancelled.');
+      return;
+    }
+
+    setState(() => _errorMessage = error);
   }
 
   bool _isValidEmail(String email) =>
@@ -472,7 +478,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Icon(Icons.cloud_off_rounded, color: _kAmber, size: 14),
                 SizedBox(width: 8),
                 Text(
-                  'Offline demo mode active.',
+                  'Running offline — some features unavailable.',
                   style: TextStyle(color: _kAmber, fontSize: 12),
                 ),
               ],

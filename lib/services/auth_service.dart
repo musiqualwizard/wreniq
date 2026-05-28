@@ -18,6 +18,19 @@ import 'firebase_service.dart';
 class AuthService extends ChangeNotifier {
   static const _keyCurrentUser = 'auth_current_user';
 
+  // Sentinel returned when the user dismisses the Google account picker.
+  // Login screen checks for this to show a friendly "cancelled" message
+  // instead of treating it as success (null) or an error.
+  static const googleCancelled = '__google_sign_in_cancelled__';
+
+  // Web client ID from google-services.json (client_type: 3).
+  // Required for Android to populate idToken reliably.
+  static const _googleWebClientId =
+      '1012207625893-dhdas8kjm3l128i6anqr245cai6obmd8.apps.googleusercontent.com';
+
+  // Shared instance — avoids state fragmentation across sign-in / sign-out calls.
+  static final _googleSignIn = GoogleSignIn(serverClientId: _googleWebClientId);
+
   UserProfile? _currentUser;
   bool _isLoading = true;
 
@@ -83,8 +96,10 @@ class AuthService extends ChangeNotifier {
       // authStateChanges fires → _handleAuthStateChange updates _currentUser.
       return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint('[EmailSignIn] FirebaseAuthException: ${e.code} — ${e.message}');
       return _mapError(e);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[EmailSignIn] unexpected error: $e');
       return 'Sign in failed. Please try again.';
     }
   }
@@ -112,8 +127,10 @@ class AuthService extends ChangeNotifier {
       );
       return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint('[EmailSignUp] FirebaseAuthException: ${e.code} — ${e.message}');
       return _mapError(e);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[EmailSignUp] unexpected error: $e');
       return 'Sign up failed. Please try again.';
     }
   }
@@ -122,20 +139,42 @@ class AuthService extends ChangeNotifier {
 
   Future<String?> signInWithGoogle() async {
     if (_isMockMode) {
-      return 'Google sign-in requires Firebase. The app is running in offline demo mode.';
+      return 'Google sign-in is unavailable offline. Please check your internet connection.';
     }
     try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return null; // user cancelled
+      debugPrint('[GoogleSignIn] button tapped — starting sign-in flow');
+
+      // Sign out first so the account picker always appears (avoids silent
+      // re-use of a cached account the user may not want).
+      await _googleSignIn.signOut();
+
+      final googleUser = await _googleSignIn.signIn();
+      debugPrint('[GoogleSignIn] account selected: ${googleUser != null}');
+
+      if (googleUser == null) {
+        // User dismissed the picker — not an error.
+        return googleCancelled;
+      }
 
       final googleAuth = await googleUser.authentication;
+      debugPrint('[GoogleSignIn] idToken exists: ${googleAuth.idToken != null}');
+      debugPrint('[GoogleSignIn] accessToken exists: ${googleAuth.accessToken != null}');
+
+      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
+        debugPrint('[GoogleSignIn] ERROR — both tokens are null');
+        return 'Google sign-in failed: could not retrieve auth tokens. '
+            'Ensure the SHA-1 certificate is registered in Firebase Console.';
+      }
+
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken:     googleAuth.idToken,
       );
 
+      debugPrint('[GoogleSignIn] signing in with Firebase credential...');
       final result = await FirebaseAuth.instance.signInWithCredential(credential);
       final user   = result.user!;
+      debugPrint('[GoogleSignIn] Firebase success — uid=${user.uid}');
 
       if (result.additionalUserInfo?.isNewUser == true) {
         await _createFirestoreUser(
@@ -146,11 +185,28 @@ class AuthService extends ChangeNotifier {
           authProvider: 'google',
         );
       }
-      return null;
+      return null; // success
+
     } on FirebaseAuthException catch (e) {
+      debugPrint('[GoogleSignIn] FirebaseAuthException: ${e.code} — ${e.message}');
       return _mapError(e);
-    } catch (_) {
-      return 'Google sign-in failed. Please try again.';
+    } catch (e) {
+      debugPrint('[GoogleSignIn] Exception: ${e.runtimeType} — $e');
+      final msg = e.toString();
+      // PlatformException: ApiException 10 = Developer Error (SHA-1 mismatch or
+      // OAuth client not configured for this package/certificate).
+      if (msg.contains('ApiException: 10') || msg.contains('sign_in_failed')) {
+        return 'Google sign-in failed: app not authorised. '
+            'The release SHA-1 must be registered in Firebase Console → '
+            'Project Settings → Android app → SHA certificate fingerprints.';
+      }
+      if (msg.contains('sign_in_cancelled') || msg.contains('canceled') || msg.contains('cancelled')) {
+        return googleCancelled;
+      }
+      if (msg.contains('network_error') || msg.contains('NETWORK_ERROR')) {
+        return 'No internet connection. Check your network and try again.';
+      }
+      return 'Google sign-in failed. Please try again.\n($msg)';
     }
   }
 
@@ -180,7 +236,7 @@ class AuthService extends ChangeNotifier {
       return;
     }
     if (_currentUser?.authProvider == 'google') {
-      await GoogleSignIn().signOut();
+      await _googleSignIn.signOut();
     }
     await FirebaseAuth.instance.signOut();
     // authStateChanges fires null → _handleAuthStateChange handles the rest.
@@ -307,8 +363,8 @@ class AuthService extends ChangeNotifier {
       'network-request-failed' => 'No internet connection. Check your network.',
       'too-many-requests'      => 'Too many attempts. Please wait and try again.',
       'user-disabled'          => 'This account has been disabled.',
-      'operation-not-allowed'  => 'This sign-in method is not enabled in Firebase console.',
-      _                        => 'Something went wrong. Please try again.',
+      'operation-not-allowed'  => 'This sign-in method is not enabled. Please use email or try again.',
+      _                        => 'Sign in failed. Please check your details and try again.',
     };
   }
 
